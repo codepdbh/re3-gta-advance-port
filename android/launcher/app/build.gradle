@@ -1,0 +1,144 @@
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+android {
+
+    namespace 'com.re3.game'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.re3.game"
+        minSdk 24
+        targetSdk 35
+        versionCode 8
+        versionName "1.0.7"
+
+        ndkVersion '27.2.12479018'
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
+    }
+
+    // Two products sharing everything (native code, controls, build config)
+    // except which on-device folder they read game data from and how they're
+    // branded -- lets a mod conversion (Frosted Winter Remastered) install
+    // side by side with the base game instead of replacing it.
+    // GameActivity.GAME_FOLDER_NAME reads BuildConfig.GAME_FOLDER_NAME.
+    // CROUCH_BUTTON adds GTA Advance's on-foot crouch toggle to the touch
+    // controls (TouchControlsView.layoutOnFoot); the native side enables the
+    // mod's gameplay changes by itself when it finds the mod's data.
+    flavorDimensions = ["variant"]
+    productFlavors {
+        standard {
+            dimension "variant"
+            buildConfigField "String", "GAME_FOLDER_NAME", "\"re3GTA\""
+            buildConfigField "boolean", "CROUCH_BUTTON", "false"
+        }
+        fwr {
+            dimension "variant"
+            applicationIdSuffix ".fwr"
+            versionNameSuffix "-fwr"
+            buildConfigField "String", "GAME_FOLDER_NAME", "\"re3GTA_FWR\""
+            buildConfigField "boolean", "CROUCH_BUTTON", "false"
+        }
+        advance {
+            dimension "variant"
+            applicationIdSuffix ".advance"
+            versionNameSuffix "-advance"
+            buildConfigField "String", "GAME_FOLDER_NAME", "\"re3-gtaadvance\""
+            buildConfigField "boolean", "CROUCH_BUTTON", "true"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+
+            externalNativeBuild {
+                cmake {
+                    cppFlags '-O3', '-fvisibility=hidden'
+                }
+            }
+
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            jniDebuggable false
+            renderscriptDebuggable false
+
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+
+        debug {
+            signingConfig signingConfigs.debug
+
+            externalNativeBuild {
+                cmake {
+                    cppFlags '-g', '-DDEBUG'
+                }
+            }
+
+            debuggable true
+            minifyEnabled false
+            jniDebuggable true
+            renderscriptDebuggable true
+        }
+    }
+
+    packagingOptions {
+        jniLibs.excludes += ['META-INF/*']
+        resources.excludes += ['META-INF/*']
+
+        // Vendored prebuilt libs (SDL2, mpg123 -- see vendor/sdl2, vendor/mpg123)
+        // ship with 4KB-aligned ELF LOAD segments, not the 16KB AGP's default
+        // packaging (targetSdk 35+: libs stored uncompressed and mmap()'d
+        // straight out of the APK zip) expects on a page-size-strict device.
+        // That mismatch is the likely cause of a real (if intermittent) crash
+        // seen on a 16KB-page Android 16 device -- first cold launch (APK's
+        // zip freshly mmap'd) failed, a relaunch (already extracted/cached by
+        // then) didn't. Forcing legacy packaging extracts the .so files to
+        // the app's normal filesystem data dir at install time instead, where
+        // they're loaded like any other file (no zip-entry alignment
+        // requirement) -- sidesteps the whole class of bug without needing to
+        // rebuild or hand-patch the vendored binaries.
+        jniLibs.useLegacyPackaging = true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file('CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+
+    buildFeatures {
+        viewBinding true
+        buildConfig = true
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDir 'jniLibs'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: "libs", include: ["*.jar"])
+
+    implementation libs.appcompat
+    implementation libs.material
+    implementation libs.constraintlayout
+    testImplementation libs.junit
+    androidTestImplementation libs.ext.junit
+    androidTestImplementation libs.espresso.core
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    fwr-flavor-only manifest override: turns on synchronous ARM MTE (Memory
+    Tagging Extension) so a heap buffer overflow/use-after-free aborts
+    immediately, at the actual bad access, with a precise tombstone,
+    instead of silently corrupting whatever global happens to be memory
+    adjacent and crashing somewhere unrelated later (several different
+    crashes chased down this session all had that shape). Scoped to this
+    flavor only: it costs some performance, not worth paying on the
+    already-stable standard build. Only takes effect on hardware that
+    actually supports MTE (this test device does); a no-op elsewhere.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:memtagMode="sync" />
+</manifest>
